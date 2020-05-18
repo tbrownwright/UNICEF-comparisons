@@ -1,0 +1,4 @@
+Country,Year,DHS_code,DHS_name,ADM_code,SIA_region_type,analysis_region_type,UTM,max_ADM_level
+DRCongo,2017-2018,CG_2017-2018,CG,COD,1,2,33,3
+Zambia,2018,ZA_2018,ZA,ZMB,2,2,34,2
+Nigeria,2018,NG_2018,NG,NGA,2,2,32,3
