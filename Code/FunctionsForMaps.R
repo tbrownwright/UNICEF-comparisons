@@ -16,12 +16,25 @@ getSmoothedMap_noSubSIA_Single <- function(Country, binned_survey_age, MeanOrSE=
 	DHS_name <- codes$DHS_name[i]
 	ADM_code <- codes$ADM_code[i]
 	
-	# Load the Della output
-	load(paste0("./Results/GAMtoMeanAndSE_Della/GAMtoMeanAndSE_", DHS_code,"_6-60m.RData"))
-
-	# Get border lines to add
-	adm0 <- readShapeSpatial(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm0.shp"))
 	
+	# Load the Della output
+	load(paste0("./Results/GAMtoMeanAndSE_Della/GAMtoMeanAndSE_", DHS_code,"_6-24m.RData"))
+	
+	#If Nigeria
+	if(ADM_code == "NGA"){
+	  # Get border lines to add
+	  adm0 <- readShapeSpatial(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm0_.shp"))
+	  adm0 <- adm0[adm0$ADM0_NAME == "NIGERIA",]
+	  
+	}
+	
+	else{
+	  
+	  adm0 <- readShapeSpatial(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm0_.shp"))
+	  
+	}
+
+
 	# Plot	
 	tmp <- ggplot()		
 	
@@ -58,7 +71,7 @@ getSmoothedMap_noSubSIA_Single <- function(Country, binned_survey_age, MeanOrSE=
 			geom_polygon(data=g_df, mapping=aes(x=long, y=lat, group=group, fill=plogis(g_df[,which_data]))) +
 			geom_contour(data=grid_tmp_lt5y, mapping=aes(x=long, y=lat, z=plogis(grid_tmp_lt5y[,which_data])), size=0.1, breaks=seq(0,1,by=0.05), colour="gray50") +
 			scale_fill_gradientn(name=legend_name, 
-								 limits=c(0,1), 	
+								 limits=c(0,0.1), 	
 								 breaks=c(0, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1),
 								 values=c(0, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1),
 								 colours=brewer.pal(10, "RdYlGn")) +
@@ -81,8 +94,7 @@ getSmoothedMap_noSubSIA_Single <- function(Country, binned_survey_age, MeanOrSE=
 			geom_polygon(data=g_df, mapping=aes(x=long, y=lat, group=group, fill=g_df[,which_data])) +
 			geom_contour(data=grid_tmp_lt5y, mapping=aes(x=long, y=lat, z=grid_tmp_lt5y[,which_data]), size=0.1, breaks=seq(0,1,by=0.05), colour="gray50") +
 			scale_fill_gradientn(name=legend_name,
-								 limits=c(0.05,0.9),
-								 breaks=seq(0.1,0.85,by=0.15),
+								 limits=c(0, 1),
 								 colours=rev(brewer.pal(10, "Spectral"))) + 
 			geom_polygon(data=adm0, aes(x=long, y=lat, z=group), colour="gray40", fill=NA, cex=0.25) +
 			guides(fill=guide_colorbar(barwidth=2, barheight=20))	
@@ -95,11 +107,11 @@ getSmoothedMap_noSubSIA_Single <- function(Country, binned_survey_age, MeanOrSE=
 			legend_name <- bquote(paste(Delta, "SE at ", .(binned_survey_age), "m"))
 
 			tmp <- tmp + 
-			geom_polygon(data=g_df, mapping=aes(x=long, y=lat, group=group, fill=g_df[,which_data]-g_df[,"SE_12m"])) +
-			geom_contour(data=grid_tmp_lt5y, mapping=aes(x=long, y=lat, z=grid_tmp_lt5y[,which_data]-grid_tmp_lt5y[,"SE_12m"]), size=0.1, breaks=seq(-0.05,0.3,by=0.01), colour="gray50") +
-			scale_fill_gradient2(name=legend_name,
-								 limits=c(-0.06, 0.3),
-								 breaks=seq(-0.05, 0.3, by=0.05)) +
+			geom_polygon(data=g_df, mapping=aes(x=long, y=lat, group=group, fill=g_df[,which_data])) +
+			geom_contour(data=grid_tmp_lt5y, mapping=aes(x=long, y=lat, z=grid_tmp_lt5y[,which_data]), size=0.1, breaks=seq(-0.05,0.3,by=0.01), colour="gray50") +
+			scale_fill_gradientn(name=legend_name,
+			                       limits=c(0.00,1),
+			                       colours=rev(brewer.pal(10, "Spectral"))) +
 			geom_polygon(data=adm0, aes(x=long, y=lat, z=group), colour="gray40", fill=NA, cex=0.25) +
 			guides(fill=guide_colorbar(barwidth=2, barheight=20))	
 		
@@ -136,6 +148,226 @@ getSmoothedMap_noSubSIA_Single <- function(Country, binned_survey_age, MeanOrSE=
 	#g$grobs[[8]][[1]][[1]][[1]][[5]]$gp$col <- "gray50"
 	grid.draw(g)
 	
+}
+
+## Description: map of the number of unvaccinated people between [lower_age, upper_age] months of age
+## Description: assuming that monthly age bins are uniformly distributed
+## Description: the minimum lower_age here is 6 months (i.e., eligibility for the analysis)
+## Sub-national SIAs: not included in prediction
+## Spatial scale: all countries
+
+getSmoothedMap_Unvaccinateds_Single <- function(Country, lower_age, upper_age) {
+  
+  i <- as.numeric(rownames(codes))[which(Country==codes$Country)]
+  
+  # Placeholders
+  DHS_code <- codes$DHS_code[i]
+  DHS_name <- codes$DHS_name[i]
+  ADM_code <- codes$ADM_code[i]
+  
+  # For plot
+  tmp <- ggplot()
+  
+  # Get water bodies
+  water <- readShapeSpatial("./Data/waterbodies_africa/waterbodies_africa.shp")
+
+    # Load the Della output
+  load(paste0("./Results/GAMtoPeople_Della/GAMtoPeople_",DHS_code,"_6-24m.RData"))
+  
+  # Get border lines to add
+  # If Nigeria
+  if(ADM_code == "NGA"){
+    adm0 <- readShapeSpatial(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm0_.shp"))
+    adm0 <- adm0[adm0$ADM0_NAME=="NIGERIA",]
+    
+  }  
+  else{
+    
+    adm0 <- readShapeSpatial(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm0_.shp"))
+    
+  }  
+
+    
+    # Calculate the number of unvaccinated people between [lower_age, upper_age]
+  rowname <- match(g_df$dummy, g$dummy)
+  unvacc <- (rowSums(grid_tmp_lt5y[rowname, paste0("p_unvacc_", lower_age:upper_age, "m")]) * (grid_tmp_lt5y[rowname, "lt5y"]/60)) #+ 1 # since we show on log scale
+  g_df$unvacc <- unvacc
+    
+    # Legend name
+  legend_name <- paste("Unvaccinateds\n", lower_age, "-", upper_age, "m", sep="")
+    
+    # Plot
+    tmp <- tmp + 
+      geom_polygon(data=g_df, mapping=aes(x=long, y=lat, group=group, fill=unvacc)) +
+      scale_fill_gradientn(name=legend_name, 
+                           colours=colorRampPalette(rev(brewer.pal(9, "RdYlBu")))(50), 
+                           trans="log",
+                           na.value="royalblue4", # aka those with 0 people
+                           limits=c(1,50000),
+                           breaks=c(1,10,100,1000,10000)) +
+      geom_polygon(data=adm0, aes(x=long, y=lat, z=group), colour="gray40", fill=NA, cex=0.25) +
+      guides(fill=guide_colorbar(barwidth=2, barheight=20))
+    
+  
+  
+  # Settings
+  tmp <- tmp + coord_fixed() + 
+    theme(axis.line=element_blank(),
+          axis.text.x=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks=element_blank(),
+          axis.title.x=element_blank(),
+          axis.title.y=element_blank(),
+          panel.background=element_blank(),
+          panel.border=element_blank(),
+          panel.grid.major=element_blank(),
+          panel.grid.minor=element_blank(),
+          plot.background=element_blank())
+  
+  # Change legend tick marks to dark
+  g <- ggplotGrob(tmp)
+  #g$grobs[[8]][[1]][[1]][[1]][[5]]$gp$col <- "gray50"
+  grid.draw(g)
+  
+}
+
+
+##Description: map of number unvaccinated people between [lower_age, upper_age] mmonths of age
+##Description: assuming that monthly age bins are uniformly distributed
+##Description: Aggregated number of people to adm region level 2 
+
+getSmoothedMap_Unvaccinateds_Single_adm2 <- function(Country, lower_age, upper_age) {
+  
+  i <- as.numeric(rownames(codes))[which(Country==codes$Country)]
+  
+  # Placeholders
+  DHS_code <- codes$DHS_code[i]
+  DHS_name <- codes$DHS_name[i]
+  ADM_code <- codes$ADM_code[i]
+  
+  # For plot
+  tmp <- ggplot()
+  
+  # Get water bodies
+  water <- st_read("./Data/waterbodies_africa/waterbodies_africa.shp")
+  
+  # Load the Della output
+  load(paste0("./Results/GAMtoPeople_Della/GAMtoPeople_",DHS_code,"_6-24m.RData"))
+  
+  # Get border lines to add
+  # If Nigeria
+  
+  if(ADM_code == "NGA"){
+    adm0 <- st_read(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm0_.shp"))
+    adm2 <- adm0[adm0$ADM0_NAME=="NIGERIA",]
+    
+    # Calculate the number of unvaccinated people between [lower_age, upper_age]
+    rowname <- match(g_df$dummy, g$dummy)
+    unvacc <- (rowSums(grid_tmp_lt5y[rowname, paste0("p_unvacc_", lower_age:upper_age, "m")]) * (grid_tmp_lt5y[rowname, "lt5y"]/60)) #+ 1 # since we show on log scale
+    g_df$unvacc <- unvacc
+    
+    g_df1 <- st_as_sf(g_df, coords =c("long", "lat"), crs = "WGS84")
+    
+    aggregated_g_df <- st_join(adm2, g_df1)%>%
+      dplyr::group_by(ADM2_NAME)%>%
+      dplyr::summarise(sumunvac = sum(unvacc))%>%
+      filter(!is.na(sumunvac))
+    
+  }
+  
+  else if(ADM_code == "COD"){
+    
+    adm2 <- st_read(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm2_.shp"))
+    
+    # Calculate the number of unvaccinated people between [lower_age, upper_age]
+    rowname <- match(g_df$dummy, g$dummy)
+    unvacc <- (rowSums(grid_tmp_lt5y[rowname, paste0("p_unvacc_", lower_age:upper_age, "m")]) * (grid_tmp_lt5y[rowname, "lt5y"]/60)) #+ 1 # since we show on log scale
+    g_df$unvacc <- unvacc
+    
+    g_df1 <- st_as_sf(g_df, coords =c("long", "lat"), crs = "WGS84")
+    
+    aggregated_g_df <- st_join(adm2, g_df1)%>%
+      dplyr::group_by(ADM2_FR)%>%
+      dplyr::summarise(sumunvac = sum(unvacc))%>%
+      dplyr::filter(!is.na(sumunvac))
+  }
+  
+  else if(ADM_code == "ZAM"){
+    
+    adm2 <- st_read(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm2_.shp"))
+    
+    # Calculate the number of unvaccinated people between [lower_age, upper_age]
+    rowname <- match(g_df$dummy, g$dummy)
+    unvacc <- (rowSums(grid_tmp_lt5y[rowname, paste0("p_unvacc_", lower_age:upper_age, "m")]) * (grid_tmp_lt5y[rowname, "lt5y"]/60)) #+ 1 # since we show on log scale
+    g_df$unvacc <- unvacc
+    
+    g_df1 <- st_as_sf(g_df, coords =c("long", "lat"), crs = "WGS84")
+    
+    aggregated_g_df <- st_join(adm2, g_df1)%>%
+      dplyr::group_by(ADM2_EN)%>%
+      dplyr::summarise(sumunvac = sum(unvacc))%>%
+      dplyr::filter(!is.na(sumunvac))
+    
+  }
+  
+  else{
+    
+    adm2 <- st_read(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm2_.shp"))
+    
+    
+    # Calculate the number of unvaccinated people between [lower_age, upper_age]
+    rowname <- match(g_df$dummy, g$dummy)
+    unvacc <- (rowSums(grid_tmp_lt5y[rowname, paste0("p_unvacc_", lower_age:upper_age, "m")]) * (grid_tmp_lt5y[rowname, "lt5y"]/60)) #+ 1 # since we show on log scale
+    g_df$unvacc <- unvacc
+    
+    g_df1 <- st_as_sf(g_df, coords =c("long", "lat"), crs = "WGS84")
+    
+    aggregated_g_df <- st_join(adm2, g_df1)%>%
+      dplyr::group_by(NAME_2)%>%
+      dplyr::summarise(sumunvac = sum(unvacc))%>%
+      filter(!is.na(sumunvac))
+    
+    
+  }
+  
+  
+  
+  # Legend name
+  legend_name <- paste("Unvaccinateds\n", lower_age, "-", upper_age, "m", sep="")
+  
+  # Plot
+  tmp <- tmp + 
+    geom_sf(data = aggregated_g_df, aes(fill = sumunvac))+
+    scale_fill_gradientn(name=legend_name, 
+    colours=colorRampPalette(rev(brewer.pal(9, "RdYlBu")))(20), 
+    trans="log",
+    na.value="royalblue4", # aka those with 0 people
+    limits=c(100,5000000),
+    breaks=c(100,1000,10000, 100000, 1000000))
+  
+  
+  
+  # Settings
+  tmp <- tmp + coord_sf() + 
+    theme(axis.line=element_blank(),
+          axis.text.x=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks=element_blank(),
+          axis.title.x=element_blank(),
+          axis.title.y=element_blank(),
+          panel.background=element_blank(),
+          panel.border=element_blank(),
+          panel.grid.major=element_blank(),
+          panel.grid.minor=element_blank(),
+          plot.background=element_blank())
+  
+  # Change legend tick marks to dark
+  g <- ggplotGrob(tmp)
+  #g$grobs[[8]][[1]][[1]][[1]][[5]]$gp$col <- "gray50"
+  grid.draw(g)
+  
+  ggsave(filename = paste0("Map_", country, lower_age, "-", age, "m_Unvaccinated.png"), path = "./Figures/", width = 6, height = 8, units ="in")
+
 }
 
 ## Description: GAM mean/SE map at binned_survey_age
@@ -1104,6 +1336,151 @@ getSmoothedMap_Unvaccinateds <- function(lower_age, upper_age) {
 	
 }
 
+################################################################################
+
+## Description: GAM mean map at binned_survey_age, with effect of sub-national SIAs
+## Description: with and without contour lines
+## Sub-national SIAs: included in prediction
+## Spatial scale: single country
+
+# getSmoothedMap_WithSubSIA_Mean_Single_NoContour <- function(Country, binned_survey_age) {
+# 	
+# 	# Get the rest
+# 	i <- as.numeric(rownames(codes))[which(Country==codes$Country)]
+# 	
+# 	# Placeholders
+# 	DHS_code <- codes$DHS_code[i]
+# 	DHS_name <- codes$DHS_name[i]
+# 	ADM_code <- codes$ADM_code[i]
+# 	
+# 	# Load the Della output
+# 	load(paste0("./Results/GAMtoMeanAndSE_Della_WithSubnationals/GAMtoMeanAndSE_WithSubnationals_", DHS_code,"_6-60m.RData"))
+# 
+# 	# Get border lines to add
+# 	adm0 <- readShapeSpatial(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm0.shp"))
+# 	
+# 	# Plot	
+# 	tmp <- ggplot()		
+# 	
+# 	# Which column are we plotting?
+# 	which_data <- paste0("Mean_", binned_survey_age, "m")
+# 
+# 	# Get water bodies
+# 	water <- readShapeSpatial("./Data/waterbodies_africa/waterbodies_africa.shp")
+# 	
+# 	# Legend name
+# 	legend_name <- paste("Mean at ", binned_survey_age, "m\nSub-national SIAs", sep="")
+# 
+# 	tmp <- tmp + 
+# 	geom_polygon(data=g_df, mapping=aes(x=long, y=lat, group=group, fill=plogis(g_df[,which_data]))) +
+# 	scale_fill_gradientn(name=legend_name, 
+# 						 limits=c(0,1), 	
+# 						 breaks=c(0, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1),
+# 						 values=c(0, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1),
+# 						 colours=brewer.pal(10, "RdYlGn")) +
+# 	geom_polygon(data=adm0, aes(x=long, y=lat, z=group), colour="gray40", fill=NA, cex=0.25) +
+# 	guides(fill=guide_colorbar(barwidth=2, barheight=20))
+# 	
+# 	# Add water in that country, if applicable
+# 	water_in_country <- rgeos::gIntersection(water, adm0, drop_lower_td=TRUE)
+# 	
+# 	if(!is.null(water_in_country)) {
+# 	
+# 		# Plot water
+# 		tmp <- tmp + geom_polygon(data=water_in_country, aes(x=long, y=lat, group=group), colour="gray40", size=0.2, fill="azure", alpha=1)
+# 	
+# 	}
+# 		
+# 	# Settings
+# 	tmp <- tmp + coord_fixed() + 
+# 			  theme(axis.line=element_blank(),
+# 					axis.text.x=element_blank(),
+# 					axis.text.y=element_blank(),
+# 					axis.ticks=element_blank(),
+# 					axis.title.x=element_blank(),
+# 					axis.title.y=element_blank(),
+# 					panel.background=element_blank(),
+# 					panel.border=element_blank(),
+# 					panel.grid.major=element_blank(),
+# 					panel.grid.minor=element_blank(),
+# 					plot.background=element_blank())
+# 	
+# 	# Change legend tick marks to dark
+# 	g <- ggplotGrob(tmp)
+# 	g$grobs[[8]][[1]][[1]][[1]][[5]]$gp$col <- "gray50"
+# 	grid.draw(g)
+# 	
+# }
+# 
+# getSmoothedMap_WithSubSIA_Mean_Single <- function(Country, binned_survey_age) {
+# 	
+# 	# Get the rest
+# 	i <- as.numeric(rownames(codes))[which(Country==codes$Country)]
+# 	
+# 	# Placeholders
+# 	DHS_code <- codes$DHS_code[i]
+# 	DHS_name <- codes$DHS_name[i]
+# 	ADM_code <- codes$ADM_code[i]
+# 	
+# 	# Load the Della output
+# 	load(paste0("./Results/GAMtoMeanAndSE_Della_WithSubnationals/GAMtoMeanAndSE_WithSubnationals_", DHS_code,"_6-60m.RData"))
+# 
+# 	# Get border lines to add
+# 	adm0 <- readShapeSpatial(paste0("./Data/ADM/", ADM_code, "_adm/", ADM_code, "_adm0.shp"))
+# 	
+# 	# Plot	
+# 	tmp <- ggplot()		
+# 	
+# 	# Which column are we plotting?
+# 	which_data <- paste0("Mean_", binned_survey_age, "m")
+# 
+# 	# Get water bodies
+# 	water <- readShapeSpatial("./Data/waterbodies_africa/waterbodies_africa.shp")
+# 	
+# 	# Legend name
+# 	legend_name <- paste("Mean at ", binned_survey_age, "m\nSub-national SIAs", sep="")
+# 
+# 	tmp <- tmp + 
+# 	geom_polygon(data=g_df, mapping=aes(x=long, y=lat, group=group, fill=plogis(g_df[,which_data]))) +
+# 	geom_contour(data=grid_tmp_lt5y, mapping=aes(x=long, y=lat, z=plogis(grid_tmp_lt5y[,which_data])), size=0.1, breaks=seq(0,1,by=0.05), colour="gray50") +
+# 	scale_fill_gradientn(name=legend_name, 
+# 						 limits=c(0,1), 	
+# 						 breaks=c(0, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1),
+# 						 values=c(0, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1),
+# 						 colours=brewer.pal(10, "RdYlGn")) +
+# 	geom_polygon(data=adm0, aes(x=long, y=lat, z=group), colour="gray40", fill=NA, cex=0.25) +
+# 	guides(fill=guide_colorbar(barwidth=2, barheight=20))
+# 
+# 	# Add water in that country, if applicable
+# 	water_in_country <- rgeos::gIntersection(water, adm0, drop_lower_td=TRUE)
+# 	
+# 	if(!is.null(water_in_country)) {
+# 	
+# 		# Plot water
+# 		tmp <- tmp + geom_polygon(data=water_in_country, aes(x=long, y=lat, group=group), colour="gray40", size=0.2, fill="azure", alpha=1)
+# 	
+# 	}
+# 		
+# 	# Settings
+# 	tmp <- tmp + coord_fixed() + 
+# 			  theme(axis.line=element_blank(),
+# 					axis.text.x=element_blank(),
+# 					axis.text.y=element_blank(),
+# 					axis.ticks=element_blank(),
+# 					axis.title.x=element_blank(),
+# 					axis.title.y=element_blank(),
+# 					panel.background=element_blank(),
+# 					panel.border=element_blank(),
+# 					panel.grid.major=element_blank(),
+# 					panel.grid.minor=element_blank(),
+# 					plot.background=element_blank())
+# 	
+# 	# Change legend tick marks to dark
+# 	g <- ggplotGrob(tmp)
+# 	g$grobs[[8]][[1]][[1]][[1]][[5]]$gp$col <- "gray50"
+# 	grid.draw(g)
+# 	
+# }
 
 ################################################################################
 
